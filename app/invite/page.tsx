@@ -14,7 +14,14 @@ export default function InvitePage() {
   const [totalInvites, setTotalInvites] = useState(0)
   const [activeInvites, setActiveInvites] = useState(0)
   const [copySuccess, setCopySuccess] = useState('')
-  const [inviteHistory, setInviteHistory] = useState([])
+  const [inviteHistory, setInviteHistory] = useState<Array<{
+    id: number;
+    username: string;
+    joinDate: string;
+    earnings: string;
+    status: string;
+    trades: number;
+  }>>([])
   const [commissionRate] = useState(15) // 15% 返佣率
 
   // 生成邀请码和链接
@@ -48,7 +55,7 @@ export default function InvitePage() {
   }, [isConnected, address])
 
   // 复制功能
-  const copyToClipboard = async (text, type) => {
+  const copyToClipboard = async (text: string, type: string) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopySuccess(`${type}已复制到剪贴板！`)

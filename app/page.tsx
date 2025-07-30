@@ -15,7 +15,14 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
-  const [liveStreams, setLiveStreams] = useState([])
+  const [liveStreams, setLiveStreams] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    streamer: string;
+    viewers: string;
+    gradient: string;
+  }>>([])
   
   // 主标签页
   const mainTabs = [
