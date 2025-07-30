@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 // Removed lucide-react import - using text symbols instead
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useWallet } from '@/contexts/WalletContext'
+import { useTrading } from '@/contexts/TradingContext'
+import TradingPanel from '@/components/TradingPanel'
 import Link from 'next/link'
 
 // 预测选项接口
@@ -82,6 +84,7 @@ export default function MarketDetailPage() {
   const params = useParams()
   const { t } = useLanguage()
   const { isConnected } = useWallet()
+  const { getPosition } = useTrading()
   const [market, setMarket] = useState<PredictionMarket | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedOption, setSelectedOption] = useState<string>('')
@@ -101,7 +104,7 @@ export default function MarketDetailPage() {
         id: '1',
         user: '0x1234...5678',
         userAvatar: '/api/placeholder/32/32?text=U1',
-        content: 'Based on recent polling data, I think Trump has a strong chance. The economic indicators are favoring the incumbent.',
+        content: '根据最新的民调数据，我认为特朗普有很大的获胜机会。经济指标对现任总统有利。',
         timestamp: '2024-01-15T10:30:00Z',
         likes: 12,
         replies: [
@@ -109,7 +112,7 @@ export default function MarketDetailPage() {
             id: '1-1',
             user: '0x9876...5432',
             userAvatar: '/api/placeholder/32/32?text=U2',
-            content: 'I disagree. The polling methodology has been questionable lately.',
+            content: '我不同意。最近的民调方法一直存在问题。',
             timestamp: '2024-01-15T10:35:00Z',
             likes: 5,
             replies: [],
@@ -121,7 +124,7 @@ export default function MarketDetailPage() {
         id: '2',
         user: '0xabcd...efgh',
         userAvatar: '/api/placeholder/32/32?text=U3',
-        content: 'This market is way too volatile. I\'m staying on the sidelines until we get closer to the election.',
+        content: '这个市场波动太大了。我会等到更接近选举时再参与。',
         timestamp: '2024-01-15T09:45:00Z',
         likes: 8,
         replies: []
@@ -130,7 +133,7 @@ export default function MarketDetailPage() {
         id: '3',
         user: '0xdef0...1234',
         userAvatar: '/api/placeholder/32/32?text=U4',
-        content: 'The "Other Candidate" option seems undervalued. There could be a surprise third-party candidate.',
+        content: '"其他候选人"选项似乎被低估了。可能会有意外的第三方候选人。',
         timestamp: '2024-01-15T08:20:00Z',
         likes: 15,
         replies: [
@@ -138,7 +141,7 @@ export default function MarketDetailPage() {
             id: '3-1',
             user: '0x5678...9abc',
             userAvatar: '/api/placeholder/32/32?text=U5',
-            content: 'Historically, third-party candidates rarely win. It\'s a long shot.',
+            content: '从历史上看，第三方候选人很少获胜。这是一个长期赌注。',
             timestamp: '2024-01-15T08:25:00Z',
             likes: 3,
             replies: [],
@@ -148,7 +151,7 @@ export default function MarketDetailPage() {
             id: '3-2',
             user: '0x2468...ace0',
             userAvatar: '/api/placeholder/32/32?text=U6',
-            content: 'True, but the odds are still attractive for a small bet.',
+            content: '确实如此，但对于小额投注来说，赔率仍然很有吸引力。',
             timestamp: '2024-01-15T08:30:00Z',
             likes: 7,
             replies: [],
@@ -241,37 +244,37 @@ export default function MarketDetailPage() {
       case '1H':
         for (let i = 5; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 10 * 60 * 1000)
-          labels.push(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }))
+          labels.push(time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
         }
         break
       case '6H':
         for (let i = 5; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 60 * 60 * 1000)
-          labels.push(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }))
+          labels.push(time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
         }
         break
       case '1D':
         for (let i = 5; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 4 * 60 * 60 * 1000)
-          labels.push(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }))
+          labels.push(time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
         }
         break
       case '1W':
         for (let i = 6; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-          labels.push(time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+          labels.push(time.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
         }
         break
       case '1M':
         for (let i = 5; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 6 * 24 * 60 * 60 * 1000)
-          labels.push(time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+          labels.push(time.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
         }
         break
       default: // ALL
         for (let i = 6; i >= 0; i--) {
           const time = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-          labels.push(time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+          labels.push(time.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
         }
     }
     
@@ -317,19 +320,19 @@ export default function MarketDetailPage() {
       // 模拟API调用
       const mockMarket: PredictionMarket = {
         id: params.id as string,
-        title: 'Who will win the 2024 US Presidential Election?',
-        description: 'This market will resolve to the candidate who wins the 2024 United States Presidential Election. The market will resolve based on the official results certified by the Electoral College.',
+        title: '谁将赢得2024年美国总统大选？',
+        description: '该市场将根据赢得2024年美国总统大选的候选人进行结算。市场将根据选举团认证的官方结果进行结算。',
         status: 'trading',
         endTime: '2024-11-05T23:59:59Z',
         totalVolume: 15420000,
         totalValue: 8950000,
         participants: 28394,
-        category: 'Politics',
+        category: '政治',
         imageUrl: '/api/placeholder/600/300?text=2024+Election',
         options: [
           {
             id: 'trump',
-            label: 'Donald Trump',
+            label: '唐纳德·特朗普',
             price: 0.45,
             volume: 6500000,
             userPosition: 0,
@@ -338,7 +341,7 @@ export default function MarketDetailPage() {
           },
           {
             id: 'biden',
-            label: 'Joe Biden',
+            label: '乔·拜登',
             price: 0.42,
             volume: 5800000,
             userPosition: 0,
@@ -347,7 +350,7 @@ export default function MarketDetailPage() {
           },
           {
             id: 'other',
-            label: 'Other Candidate',
+            label: '其他候选人',
             price: 0.13,
             volume: 3120000,
             userPosition: 0,
@@ -362,7 +365,7 @@ export default function MarketDetailPage() {
         {
           id: '1',
           user: '0x1234...5678',
-          option: 'Donald Trump',
+          option: '唐纳德·特朗普',
           type: 'buy',
           amount: 1000,
           price: 0.45,
@@ -371,7 +374,7 @@ export default function MarketDetailPage() {
         {
           id: '2',
           user: '0x9876...5432',
-          option: 'Joe Biden',
+          option: '乔·拜登',
           type: 'sell',
           amount: 500,
           price: 0.42,
@@ -380,7 +383,7 @@ export default function MarketDetailPage() {
         {
           id: '3',
           user: '0xabcd...efgh',
-          option: 'Other Candidate',
+          option: '其他候选人',
           type: 'buy',
           amount: 200,
           price: 0.13,
@@ -1016,67 +1019,18 @@ export default function MarketDetailPage() {
           
           {/* Trading Panel */}
           <div className="space-y-4 sm:space-y-6">
-            <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl border border-gray-800/50 p-4 sm:p-6">
-                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">{t('market.trade')}</h3>
-                
-                {!isConnected ? (
-                  <div className="text-center py-6 sm:py-8">
-                    <p className="text-gray-400 mb-3 sm:mb-4 text-sm sm:text-base">{t('market.connectToTrade')}</p>
-                    <button className="w-full py-2.5 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-sm sm:text-base">{t('market.connectWallet')}</button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 sm:space-y-4">
-                    {selectedOption && (
-                      <div className="p-2.5 sm:p-3 bg-gray-800/50 rounded-lg">
-                      <div className="text-xs sm:text-sm text-gray-400">{t('market.selectedOption')}</div>
-                        <div className="font-medium text-sm sm:text-base">
-                          {market.options.find(opt => opt.id === selectedOption)?.label}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="flex space-x-2">
-                      <button 
-                        onClick={() => setTradeType('buy')}
-                        className={`flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                          tradeType === 'buy' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {t('market.buy')}
-                      </button>
-                      <button 
-                        onClick={() => setTradeType('sell')}
-                        className={`flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                          tradeType === 'sell' ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {t('market.sell')}
-                      </button>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs sm:text-sm text-gray-400 mb-1.5 sm:mb-2">
-                        {t('market.amount')}
-                      </label>
-                      <input 
-                        type="number"
-                        value={tradeAmount}
-                        onChange={(e) => setTradeAmount(e.target.value)}
-                        placeholder={t('market.enterAmount')}
-                        className="w-full p-2.5 sm:p-3 bg-gray-800/50 border border-gray-700/50 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                      />
-                    </div>
-                    
-                    <button 
-                      onClick={handleTrade}
-                      disabled={!selectedOption || !tradeAmount}
-                      className="w-full py-2.5 sm:py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                    >
-                      {tradeType === 'buy' ? t('market.buyShares') : t('market.sellShares')}
-                    </button>
-                  </div>
-                )}
-              </div>
+            {market && (
+              <TradingPanel
+                marketId={market.id}
+                marketTitle={market.title}
+                yesPrice={market.options[0]?.price || 0.5}
+                noPrice={market.options[1]?.price || 0.5}
+                yesPercentage={Math.round((market.options[0]?.price || 0.5) * 100)}
+                volume={`$${market.totalVolume.toLocaleString()}`}
+                participants={market.participants}
+                endDate={market.endTime}
+              />
+            )}
             
             {/* Recent Transactions */}
             <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl border border-gray-800/50 p-4 sm:p-6">

@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { useWallet } from '../contexts/WalletContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useTrading } from '../contexts/TradingContext'
 import PredictionModal from './PredictionModal'
 import { User } from 'lucide-react'
+import { MarketOption } from '../mock/markets'
 
 interface PredictionCardProps {
   id: string
@@ -51,7 +53,11 @@ export default function PredictionCard({
 }: PredictionCardProps) {
   const { isConnected } = useWallet()
   const { t } = useLanguage()
+  const { getPosition, marketData } = useTrading()
   const [showModal, setShowModal] = useState(false)
+  
+  const userPosition = getPosition(id)
+  const currentMarketData = marketData[id]
   
   // 处理options的默认值
   const marketOptions = options || [
@@ -273,6 +279,23 @@ export default function PredictionCard({
           <div className="text-primary font-semibold text-xs">{getTimeRemaining(endDate)}</div>
         </div>
 
+        {/* User Position */}
+        {userPosition && (
+          <div className="mb-3 p-2 bg-blue-600/10 border border-blue-600/20 rounded-lg">
+            <div className="text-blue-400 text-xs mb-1 text-center">您的持仓</div>
+            <div className="flex justify-between items-center text-xs">
+              <span className={`font-medium ${
+                userPosition.option === 'yes' ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {userPosition.option === 'yes' ? '是' : '否'}
+              </span>
+              <span className="text-primary font-semibold">
+                ${userPosition.amount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
          {status !== 'ended' && (
            <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(marketOptions.length, 2)}, 1fr)` }}>
@@ -312,7 +335,6 @@ export default function PredictionCard({
           marketTitle={title}
           selectedOption={selectedOption}
           currentPercentage={marketOptions.find(opt => opt.id === selectedOption)?.percentage || 0}
-           options={marketOptions}
           marketId={id}
         />
       )}

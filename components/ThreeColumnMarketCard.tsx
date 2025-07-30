@@ -69,7 +69,7 @@ export default function ThreeColumnMarketCard({ market, onCardClick }: ThreeColu
         
         {/* Status Badge */}
         <div className={`absolute top-2 md:top-3 right-2 md:right-3 px-1.5 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-medium ${getStatusColor(market.status)}`}>
-          <span className="hidden sm:inline">{market.status.replace('_', ' ').toUpperCase()}</span>
+          <span className="hidden sm:inline">{market.status === 'ending_soon' ? '即将结束' : market.status === 'active' ? '进行中' : '已结束'}</span>
           <span className="sm:hidden">{market.status === 'ending_soon' ? '即将结束' : market.status === 'active' ? '进行中' : '已结束'}</span>
         </div>
         

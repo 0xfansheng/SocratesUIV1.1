@@ -3,28 +3,32 @@
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useWallet } from '../contexts/WalletContext'
+import { useTrading } from '../contexts/TradingContext'
 
 interface PredictionModalProps {
   isOpen: boolean
   onClose: () => void
   marketTitle: string
-  predictionType: 'yes' | 'no'
+  selectedOption: string
   currentPercentage: number
-  onConfirm: (amount: number) => void
+  marketId: string
 }
 
 const PredictionModal = ({
   isOpen,
   onClose,
   marketTitle,
-  predictionType,
+  selectedOption,
   currentPercentage,
-  onConfirm
+  marketId
 }: PredictionModalProps) => {
   const { t } = useLanguage()
-  const { balance, isConnected } = useWallet()
+  const { balance, isConnected, deductBalance } = useWallet()
+  const { executeTrade, isTrading } = useTrading()
   const [amount, setAmount] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   const fee = parseFloat(amount) * 0.02 || 0 // 2% fee
   const total = parseFloat(amount) + fee || 0
@@ -33,20 +37,48 @@ const PredictionModal = ({
     if (!isOpen) {
       setAmount('')
       setIsSubmitting(false)
+      setError('')
+      setSuccess(false)
     }
   }, [isOpen])
 
   const handleSubmit = async () => {
-    if (!amount || parseFloat(amount) <= 0 || total > balance) return
+    if (!amount || parseFloat(amount) <= 0 || total > balance || !isConnected) return
     
     setIsSubmitting(true)
+    setError('')
     
-    // Simulate transaction delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    onConfirm(parseFloat(amount))
-    setIsSubmitting(false)
-    onClose()
+    try {
+      // 执行交易
+      const success = await executeTrade({
+        marketId,
+        marketTitle,
+        option: selectedOption as 'yes' | 'no',
+        type: 'buy',
+        amount: parseFloat(amount),
+        price: 0.5 // 默认价格，实际会使用市场价格
+      })
+      
+      if (success) {
+        // 扣除余额
+        const deducted = deductBalance(total)
+        if (deducted) {
+          setSuccess(true)
+          setTimeout(() => {
+            onClose()
+          }, 1500)
+        } else {
+          setError('余额扣除失败')
+        }
+      } else {
+        setError('交易执行失败，请重试')
+      }
+    } catch (error) {
+      console.error('交易错误:', error)
+      setError('交易失败，请重试')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleMaxClick = () => {
@@ -81,21 +113,21 @@ const PredictionModal = ({
 
         {/* Market Info */}
         <div className="mb-6">
-          <h3 className="text-sm text-secondary mb-2">Market</h3>
+          <h3 className="text-sm text-secondary mb-2">市场</h3>
           <p className="text-primary font-medium line-clamp-2">{marketTitle}</p>
         </div>
 
         {/* Prediction Type */}
         <div className="mb-6">
           <div className={`inline-flex items-center px-4 py-2 rounded-lg font-medium ${
-            predictionType === 'yes' 
+            selectedOption === 'yes' 
               ? 'bg-green-600/20 text-green-400 border border-green-600/30'
               : 'bg-red-600/20 text-red-400 border border-red-600/30'
           }`}>
             <span className="mr-2">
-              {predictionType === 'yes' ? '📈' : '📉'}
+              {selectedOption === 'yes' ? '📈' : '📉'}
             </span>
-            {predictionType === 'yes' ? `YES (${currentPercentage}%)` : `NO (${100 - currentPercentage}%)`}
+            {selectedOption === 'yes' ? `是 (${currentPercentage}%)` : `否 (${100 - currentPercentage}%)`}
           </div>
         </div>
 
@@ -118,7 +150,7 @@ const PredictionModal = ({
               onClick={handleMaxClick}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-accent-green text-sm font-medium hover:text-accent-green/80 transition-colors"
             >
-              MAX
+              最大
             </button>
           </div>
         </div>
@@ -153,10 +185,22 @@ const PredictionModal = ({
           </div>
         )}
 
+        {/* Success Message */}
+        {success && (
+          <div className="mb-4 p-3 bg-green-600/20 border border-green-600/30 rounded-lg">
+            <p className="text-green-400 text-sm flex items-center">
+              <span className="mr-2">✅</span>
+              交易成功！正在处理...
+            </p>
+          </div>
+        )}
+
         {/* Error Message */}
-        {total > balance && (
+        {(total > balance || error) && (
           <div className="mb-4 p-3 bg-red-600/20 border border-red-600/30 rounded-lg">
-            <p className="text-red-400 text-sm">Insufficient balance</p>
+            <p className="text-red-400 text-sm">
+              {error || '余额不足'}
+            </p>
           </div>
         )}
 
@@ -171,17 +215,22 @@ const PredictionModal = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!amount || parseFloat(amount) <= 0 || total > balance || !isConnected || isSubmitting}
+            disabled={!amount || parseFloat(amount) <= 0 || total > balance || !isConnected || isSubmitting || isTrading || success}
             className={`flex-1 font-medium py-3 px-4 rounded-lg transition-all duration-200 ${
-              predictionType === 'yes'
+              selectedOption === 'yes'
                 ? 'bg-green-600 hover:bg-green-500 disabled:bg-green-600/50'
                 : 'bg-red-600 hover:bg-red-500 disabled:bg-red-600/50'
             } text-white disabled:cursor-not-allowed`}
           >
-            {isSubmitting ? (
+            {isSubmitting || isTrading ? (
               <div className="flex items-center justify-center">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                Processing...
+                {success ? '交易成功' : '处理中...'}
+              </div>
+            ) : success ? (
+              <div className="flex items-center justify-center">
+                <span className="mr-2">✅</span>
+                交易完成
               </div>
             ) : (
               t('button.confirm')

@@ -9,6 +9,8 @@ interface WalletContextType {
   connectWallet: () => Promise<void>
   disconnectWallet: () => void
   isConnecting: boolean
+  deductBalance: (amount: number) => boolean
+  addBalance: (amount: number) => void
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
@@ -49,17 +51,35 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setBalance(0)
     localStorage.removeItem('wallet_connected')
     localStorage.removeItem('wallet_address')
+    localStorage.removeItem('wallet_balance')
+  }
+
+  const deductBalance = (amount: number): boolean => {
+    if (balance >= amount) {
+      const newBalance = balance - amount
+      setBalance(newBalance)
+      localStorage.setItem('wallet_balance', newBalance.toString())
+      return true
+    }
+    return false
+  }
+
+  const addBalance = (amount: number) => {
+    const newBalance = balance + amount
+    setBalance(newBalance)
+    localStorage.setItem('wallet_balance', newBalance.toString())
   }
 
   // Check for existing connection on mount
   useEffect(() => {
     const wasConnected = localStorage.getItem('wallet_connected')
     const storedAddress = localStorage.getItem('wallet_address')
+    const storedBalance = localStorage.getItem('wallet_balance')
     
     if (wasConnected === 'true' && storedAddress) {
       setIsConnected(true)
       setAddress(storedAddress)
-      setBalance(Math.floor(Math.random() * 5000) + 1000)
+      setBalance(storedBalance ? parseFloat(storedBalance) : Math.floor(Math.random() * 5000) + 1000)
     }
   }, [])
 
@@ -70,7 +90,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       balance,
       connectWallet,
       disconnectWallet,
-      isConnecting
+      isConnecting,
+      deductBalance,
+      addBalance
     }}>
       {children}
     </WalletContext.Provider>

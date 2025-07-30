@@ -178,9 +178,9 @@ const MarketCard = ({
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         marketTitle={title}
-        predictionType={predictionType}
+        selectedOption={predictionType}
         currentPercentage={predictionType === 'yes' ? currentYesPercentage : currentNoPercentage}
-        onConfirm={handleConfirmPrediction}
+        marketId={id}
       />
     </div>
   )

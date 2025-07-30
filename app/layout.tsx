@@ -4,6 +4,7 @@ import './globals.css'
 import { LanguageProvider } from '../contexts/LanguageContext'
 import { WalletProvider } from '../contexts/WalletContext'
 import { ThemeProvider } from '../contexts/ThemeContext'
+import { TradingProvider } from '../contexts/TradingContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -23,7 +24,9 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <WalletProvider>
-              {children}
+              <TradingProvider>
+                {children}
+              </TradingProvider>
             </WalletProvider>
           </LanguageProvider>
         </ThemeProvider>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useWallet } from '../contexts/WalletContext'
@@ -12,10 +12,35 @@ const Navbar = () => {
   const { theme, toggleTheme } = useTheme()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showWalletMenu, setShowWalletMenu] = useState(false)
+  const [balance, setBalance] = useState('0.00')
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'en' ? 'zh' : 'en')
-  }
+  // 模拟获取余额
+  useEffect(() => {
+    if (isConnected && address) {
+      setIsLoadingBalance(true)
+      // 模拟API调用获取余额
+      const fetchBalance = async () => {
+        try {
+          // 模拟网络延迟
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          // 模拟随机余额
+          const mockBalance = (Math.random() * 10000 + 1000).toFixed(2)
+          setBalance(mockBalance)
+        } catch (error) {
+          console.error('获取余额失败:', error)
+          setBalance('0.00')
+        } finally {
+          setIsLoadingBalance(false)
+        }
+      }
+      fetchBalance()
+    } else {
+      setBalance('0.00')
+    }
+  }, [isConnected, address])
+
+  // 移除语言切换功能，只支持中文
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -49,6 +74,32 @@ const Navbar = () => {
               {t('nav.myMarkets')}
             </Link>
             
+            <Link 
+              href="/portfolio" 
+              className="text-secondary hover:text-primary transition-colors font-medium text-sm lg:text-base whitespace-nowrap"
+            >
+              投资组合
+            </Link>
+            
+            {/* Balance Display */}
+            {isConnected && (
+              <div className="flex items-center space-x-2 bg-primary/10 border border-primary/20 px-3 py-2 rounded-lg">
+                <svg className="w-4 h-4 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <span className="text-sm font-medium text-primary">
+                  {isLoadingBalance ? (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      <span>加载中...</span>
+                    </div>
+                  ) : (
+                    `¥${balance}`
+                  )}
+                </span>
+              </div>
+            )}
+
             {/* Wallet Connection */}
             {isConnected ? (
               <div className="relative">
@@ -65,10 +116,23 @@ const Navbar = () => {
                 </button>
                 
                 {showWalletMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-tertiary border border-secondary rounded-lg shadow-xl z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-tertiary border border-secondary rounded-lg shadow-xl z-50">
                     <div className="p-3 border-b border-secondary">
                       <p className="text-xs text-secondary">{t('nav.wallet.address')}</p>
                       <p className="text-sm text-primary font-mono">{formatAddress(address!)}</p>
+                    </div>
+                    <div className="p-3 border-b border-secondary">
+                      <p className="text-xs text-secondary">账户余额</p>
+                      <p className="text-lg font-bold text-accent-green">
+                        {isLoadingBalance ? (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 border-2 border-accent-green/30 border-t-accent-green rounded-full animate-spin" />
+                            <span className="text-sm">加载中...</span>
+                          </div>
+                        ) : (
+                          `¥${balance}`
+                        )}
+                      </p>
                     </div>
                     <button
                       onClick={() => {
@@ -124,15 +188,7 @@ const Navbar = () => {
               <span className="hidden xl:inline">{theme === 'dark' ? t('theme.light') : t('theme.dark')}</span>
             </button>
             
-            {/* Language Toggle */}
-            <button 
-              onClick={toggleLanguage}
-              className="btn-secondary text-xs lg:text-sm flex items-center space-x-1 px-2 lg:px-3 py-2 min-w-[60px] lg:min-w-[70px]"
-              title="切换语言 / Switch Language"
-            >
-              <span className="text-sm">{language === 'en' ? '🇺🇸' : '🇨🇳'}</span>
-              <span className="font-medium">{language.toUpperCase()}</span>
-            </button>
+            {/* 移除语言切换按钮 */}
           </div>
 
           {/* Mobile Menu Button */}
@@ -171,9 +227,24 @@ const Navbar = () => {
             {isConnected ? (
               <div className="space-y-2 mx-4">
                 <div className="text-center p-3 bg-accent-green/20 border border-accent-green/30 rounded-lg">
-                  <div className="flex items-center justify-center space-x-2 text-accent-green">
+                  <div className="flex items-center justify-center space-x-2 text-accent-green mb-2">
                     <div className="w-2 h-2 bg-accent-green rounded-full" />
                     <span className="font-medium text-sm">{formatAddress(address!)}</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-4 h-4 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                    <span className="font-bold text-accent-green">
+                      {isLoadingBalance ? (
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 border-2 border-accent-green/30 border-t-accent-green rounded-full animate-spin" />
+                          <span className="text-sm">加载中...</span>
+                        </div>
+                      ) : (
+                        `¥${balance}`
+                      )}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -236,18 +307,7 @@ const Navbar = () => {
                 <span>{theme === 'dark' ? t('theme.light') : t('theme.dark')}</span>
               </button>
               
-              {/* Mobile Language Toggle */}
-              <button 
-                onClick={() => {
-                  toggleLanguage()
-                  setIsMenuOpen(false)
-                }}
-                className="btn-secondary text-sm flex-1 flex items-center justify-center space-x-2 py-3"
-                title="切换语言 / Switch Language"
-              >
-                <span className="text-base">{language === 'en' ? '🇺🇸' : '🇨🇳'}</span>
-                <span className="font-medium">{language.toUpperCase()}</span>
-              </button>
+              {/* 移除移动端语言切换按钮 */}
             </div>
           </div>
         )}

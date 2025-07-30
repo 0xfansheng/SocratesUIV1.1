@@ -1,630 +1,72 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '../components/Navbar'
 import PredictionCard from '../components/PredictionCard'
-import MarketDetail from '../components/MarketDetail'
-import ThreeColumnMarketCard from '../components/ThreeColumnMarketCard'
 import { useLanguage } from '../contexts/LanguageContext'
 import { mockMarkets } from '../mock/markets'
-
-// 主标签页将在组件内部使用国际化
-
-// Three Column Market View Component
-function ThreeColumnMarketView({ markets, searchQuery, selectedCategory, sortBy, onCardClick }: {
-  markets: any[]
-  searchQuery: string
-  selectedCategory: string
-  sortBy: string
-  onCardClick: (marketId: string) => void
-}) {
-  const { t } = useLanguage()
-  const [displayedMarkets, setDisplayedMarkets] = useState<any[][]>([[], [], []])
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [page, setPage] = useState(1)
-  const itemsPerPage = 10
-
-  // Filter and sort markets
-  const filteredMarkets = useMemo(() => {
-    let filtered = markets
-
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(market => 
-        market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        market.category.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    }
-
-    // Apply category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(market => market.category === selectedCategory)
-    }
-
-    // Apply sorting
-    switch (sortBy) {
-      case 'volume':
-        filtered.sort((a, b) => (b.volume || 0) - (a.volume || 0))
-        break
-      case 'ending':
-        filtered.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
-        break
-      case 'popular':
-        filtered.sort((a, b) => (b.participants || 0) - (a.participants || 0))
-        break
-      default: // newest
-        filtered.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
-    }
-
-    return filtered
-  }, [markets, searchQuery, selectedCategory, sortBy])
-
-  // Initialize markets on first load
-  useEffect(() => {
-    const initialMarkets = filteredMarkets.slice(0, itemsPerPage * 3)
-    const columns: any[][] = [[], [], []]
-    
-    initialMarkets.forEach((market, index) => {
-      columns[index % 3].push(market)
-    })
-    
-    setDisplayedMarkets(columns)
-    setPage(1)
-    setHasMore(filteredMarkets.length > itemsPerPage * 3)
-  }, [filteredMarkets])
-
-  // Load more markets
-  const loadMore = useCallback(() => {
-    if (loading || !hasMore) return
-    
-    setLoading(true)
-    
-    setTimeout(() => {
-      const startIndex = page * itemsPerPage * 3
-      const endIndex = startIndex + itemsPerPage * 3
-      const newMarkets = filteredMarkets.slice(startIndex, endIndex)
-      
-      if (newMarkets.length === 0) {
-        setHasMore(false)
-        setLoading(false)
-        return
-      }
-      
-      const newColumns: any[][] = [[], [], []]
-      newMarkets.forEach((market, index) => {
-        newColumns[index % 3].push(market)
-      })
-      
-      setDisplayedMarkets(prev => [
-        [...prev[0], ...newColumns[0]],
-        [...prev[1], ...newColumns[1]],
-        [...prev[2], ...newColumns[2]]
-      ])
-      
-      setPage(prev => prev + 1)
-      setHasMore(endIndex < filteredMarkets.length)
-      setLoading(false)
-    }, 500)
-  }, [loading, hasMore, page, filteredMarkets])
-
-  // Intersection Observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
-          loadMore()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    const sentinel = document.getElementById('scroll-sentinel')
-    if (sentinel) {
-      observer.observe(sentinel)
-    }
-
-    return () => {
-      if (sentinel) {
-        observer.unobserve(sentinel)
-      }
-    }
-  }, [hasMore, loading, loadMore])
-
-  return (
-    <div className="min-h-screen bg-black text-white font-['Space_Grotesk']">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {displayedMarkets.map((column, columnIndex) => (
-            <div key={columnIndex} className="space-y-6">
-              {column.map((market, index) => (
-                <div 
-                  key={market.id} 
-                  className="animate-fade-in"
-                  style={{ animationDelay: `${(columnIndex * 100) + (index * 50)}ms` }}
-                >
-                  <ThreeColumnMarketCard {...market} onCardClick={onCardClick} />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        
-        {/* Loading indicator */}
-        {loading && (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00FFAE]"></div>
-            <span className="ml-3 text-gray-400">{t('button.loadMore')}</span>
-          </div>
-        )}
-        
-        {/* Load more button */}
-        {!loading && hasMore && (
-          <div className="text-center mt-8">
-            <button 
-              onClick={loadMore}
-              className="bg-[#00FFAE] hover:bg-[#00D4AA] text-black font-bold py-3 px-8 rounded-lg transition-all duration-200 hover:scale-105"
-            >
-              {t('button.loadMore')}
-            </button>
-          </div>
-        )}
-        
-        {/* No more data */}
-        {!hasMore && displayedMarkets[0].length > 0 && (
-          <div className="text-center py-8 text-gray-400">
-            {t('search.noResults')}
-          </div>
-        )}
-        
-        {/* Empty state */}
-        {!loading && displayedMarkets[0].length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-4">{t('search.noResults')}</div>
-            <p className="text-gray-500">{t('search.clearFilters')}</p>
-          </div>
-        )}
-        
-        {/* Scroll sentinel for infinite scroll */}
-        <div id="scroll-sentinel" className="h-4"></div>
-      </div>
-    </div>
-  )
-}
-
-const timeFilters = [
-  { key: '1m', label: '1分钟', active: false },
-  { key: '5m', label: '5分钟', active: false },
-  { key: '1h', label: '1小时', active: true },
-  { key: '6h', label: '6小时', active: false },
-  { key: '24h', label: '24小时', active: false }
-]
-
-const smartWallets = [
-  {
-    id: '1',
-    address: 'gmgM...dra',
-    avatar: '🔥',
-    pnl1d: '+12.4%',
-    pnl7d: '+108.3%',
-    pnl30d: '+10.3%',
-    winRate7d: '90%',
-    trades7d: 148,
-    followers: 473,
-    balance: '$18.8K',
-    status: 'online'
-  },
-  {
-    id: '2', 
-    address: 'ret3...7u3',
-    avatar: '💎',
-    pnl1d: '+308%',
-    pnl7d: '+145.5%',
-    pnl30d: '+145.5%',
-    winRate7d: '100%',
-    trades7d: 106,
-    followers: 277,
-    balance: '$9.839.2',
-    status: 'online'
-  },
-  {
-    id: '3',
-    address: 'Cupsey',
-    avatar: '🎯',
-    pnl1d: '+18.8%',
-    pnl7d: '+11.8%',
-    pnl30d: '+17%',
-    winRate7d: '63.6%',
-    trades7d: 10237,
-    followers: 24372,
-    balance: '$1,446.3',
-    status: 'online'
-  },
-  {
-    id: '4',
-    address: 'Alpha...9x2',
-    avatar: '🚀',
-    pnl1d: '+45.2%',
-    pnl7d: '+234.7%',
-    pnl30d: '+189.4%',
-    winRate7d: '85%',
-    trades7d: 89,
-    followers: 1247,
-    balance: '$45.2K',
-    status: 'online'
-  },
-  {
-    id: '5',
-    address: 'Whale...k8m',
-    avatar: '🐋',
-    pnl1d: '+89.1%',
-    pnl7d: '+67.3%',
-    pnl30d: '+156.8%',
-    winRate7d: '78%',
-    trades7d: 234,
-    followers: 3456,
-    balance: '$127.5K',
-    status: 'online'
-  },
-  {
-    id: '6',
-    address: 'Degen...5f7',
-    avatar: '⚡',
-    pnl1d: '+156.3%',
-    pnl7d: '+89.2%',
-    pnl30d: '+234.1%',
-    winRate7d: '92%',
-    trades7d: 67,
-    followers: 892,
-    balance: '$78.9K',
-    status: 'online'
-  },
-  {
-    id: '7',
-    address: 'Smart...3a1',
-    avatar: '🧠',
-    pnl1d: '+23.7%',
-    pnl7d: '+178.4%',
-    pnl30d: '+267.9%',
-    winRate7d: '88%',
-    trades7d: 156,
-    followers: 2134,
-    balance: '$89.3K',
-    status: 'online'
-  },
-  {
-    id: '8',
-    address: 'Profit...7k9',
-    avatar: '💰',
-    pnl1d: '+67.8%',
-    pnl7d: '+123.6%',
-    pnl30d: '+198.2%',
-    winRate7d: '81%',
-    trades7d: 298,
-    followers: 1789,
-    balance: '$156.7K',
-    status: 'online'
-  },
-  {
-    id: '9',
-    address: 'Ninja...2b4',
-    avatar: '🥷',
-    pnl1d: '+34.5%',
-    pnl7d: '+89.7%',
-    pnl30d: '+145.3%',
-    winRate7d: '76%',
-    trades7d: 445,
-    followers: 567,
-    balance: '$34.8K',
-    status: 'offline'
-  },
-  {
-    id: '10',
-    address: 'Titan...8x5',
-    avatar: '⭐',
-    pnl1d: '+78.9%',
-    pnl7d: '+156.2%',
-    pnl30d: '+289.6%',
-    winRate7d: '94%',
-    trades7d: 78,
-    followers: 4567,
-    balance: '$234.5K',
-    status: 'online'
-  },
-  {
-    id: '11',
-    address: 'Crypto...9m3',
-    avatar: '🎲',
-    pnl1d: '+12.3%',
-    pnl7d: '+45.8%',
-    pnl30d: '+78.4%',
-    winRate7d: '69%',
-    trades7d: 567,
-    followers: 234,
-    balance: '$23.4K',
-    status: 'offline'
-  },
-  {
-    id: '12',
-    address: 'Moon...4r7',
-    avatar: '🌙',
-    pnl1d: '+234.7%',
-    pnl7d: '+345.2%',
-    pnl30d: '+567.8%',
-    winRate7d: '96%',
-    trades7d: 45,
-    followers: 6789,
-    balance: '$456.7K',
-    status: 'online'
-  }
-]
 
 export default function Home() {
   const { t } = useLanguage()
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('Markets')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [sortBy, setSortBy] = useState('newest')
+  const [liveStreams, setLiveStreams] = useState([])
   
-  // 使用国际化的主标签页
+  // 主标签页
   const mainTabs = [
-    { key: 'Markets', label: t('tab.markets'), icon: '📊' },
-    { key: 'Following', label: t('tab.following'), icon: '👥' },
-    { key: 'Live', label: t('tab.live'), icon: '📺' }
+    { key: 'Markets', label: t('tab.markets') || '市场', icon: '📊' },
+    { key: 'Following', label: t('tab.following') || '跟单', icon: '👥' },
+    { key: 'Live', label: t('tab.live') || '直播', icon: '📺' },
+    { key: 'Invite', label: '邀请', icon: '🎁' }
   ]
+
+
+
+  // 生成随机直播
+  const generateRandomStreams = () => {
+    const streamers = ['CryptoMaster', 'MarketGuru', 'TradePro', 'PumpKing', 'CoinSage', 'TradeWizard']
+    const titles = [
+      '🚀 新币发射直播',
+      '📈 市场分析直播', 
+      '💰 交易策略分享',
+      '🔥 热门币种解析',
+      '📊 技术指标教学',
+      '💎 价值投资分享'
+    ]
+    const gradients = [
+      'from-purple-500 to-pink-500',
+      'from-blue-500 to-cyan-500', 
+      'from-orange-500 to-red-500',
+      'from-green-500 to-teal-500',
+      'from-yellow-500 to-orange-500',
+      'from-indigo-500 to-purple-500'
+    ]
+    
+    return Array.from({ length: 3 }, (_, i) => ({
+      id: String(i + 1),
+      title: titles[Math.floor(Math.random() * titles.length)],
+      description: '实时分析市场趋势，分享投资策略',
+      streamer: `@${streamers[Math.floor(Math.random() * streamers.length)]}`,
+      viewers: `${Math.floor(Math.random() * 2000 + 500)}`,
+      gradient: gradients[Math.floor(Math.random() * gradients.length)]
+    }))
+  }
   
   // 处理市场卡片点击事件
   const handleCardClick = (marketId: string) => {
     router.push(`/market/${marketId}`)
   }
-  
-  const [activeTab, setActiveTab] = useState('Markets')
-  const [selectedTimeFilter, setSelectedTimeFilter] = useState('1h')
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null)
-  const [selectedWallet, setSelectedWallet] = useState<string | null>(null)
-  const [marketView, setMarketView] = useState<'waterfall' | 'three-column'>('waterfall')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [sortBy, setSortBy] = useState('newest')
-  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now())
-  const [scrollPosition, setScrollPosition] = useState(0)
-  const [launchingRefreshTime, setLaunchingRefreshTime] = useState(Date.now())
-  const [launchedRefreshTime, setLaunchedRefreshTime] = useState(Date.now())
-  const [waterfallItems, setWaterfallItems] = useState<string[]>([])
-  const [isWaterfallActive, setIsWaterfallActive] = useState(false)
-  const [launchingWaterfallItems, setLaunchingWaterfallItems] = useState<string[]>([])
-  const [isLaunchingWaterfallActive, setIsLaunchingWaterfallActive] = useState(false)
-  
-  // 新增状态：三列数据管理
-  const [newCreatedMarkets, setNewCreatedMarkets] = useState<any[]>([])
-  const [aboutToLaunchMarkets, setAboutToLaunchMarkets] = useState<any[]>([])
-  const [launchedMarkets, setLaunchedMarkets] = useState<any[]>([])
 
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  // 初始化三列数据 - 一开始就显示大量话题
-  useEffect(() => {
-    // 初始化最新创建话题（参与人数较少的新话题）- 显示更多初始数据
-    const initialNewCreated = []
-    for (let i = 0; i < 15; i++) {
-      const randomMarket = mockMarkets[Math.floor(Math.random() * mockMarkets.length)]
-      initialNewCreated.push({
-        ...randomMarket,
-        id: randomMarket.id + '_new_' + Date.now() + '_' + i,
-        title: `${randomMarket.title} (${Math.floor(Math.random() * 30) + 1}分钟前创建)`,
-        participants: Math.floor(Math.random() * 80) + 5,
-        status: 'active'
-      })
-    }
-    setNewCreatedMarkets(initialNewCreated)
-
-    // 初始化即将发射话题（参与人数适中的话题）- 显示更多初始数据
-    const initialAboutToLaunch = []
-    for (let i = 0; i < 15; i++) {
-      const randomMarket = mockMarkets[Math.floor(Math.random() * mockMarkets.length)]
-      initialAboutToLaunch.push({
-        ...randomMarket,
-        id: randomMarket.id + '_launching_' + Date.now() + '_' + i,
-        title: `${randomMarket.title} (热度上升中)`,
-        participants: Math.floor(Math.random() * 800) + 100,
-        status: 'active'
-      })
-    }
-    setAboutToLaunchMarkets(initialAboutToLaunch)
-
-    // 初始化已发射话题（参与人数较多的成熟话题）- 显示更多初始数据
-    const initialLaunched = []
-    for (let i = 0; i < 15; i++) {
-      const randomMarket = mockMarkets[Math.floor(Math.random() * mockMarkets.length)]
-      initialLaunched.push({
-        ...randomMarket,
-        id: randomMarket.id + '_launched_' + Date.now() + '_' + i,
-        title: `${randomMarket.title} (已成功发射)`,
-        participants: Math.floor(Math.random() * 2000) + 1000,
-        status: 'active'
-      })
-    }
-    setLaunchedMarkets(initialLaunched)
-  }, [])
-
-  // 最新创建话题：每10秒追加一个新卡片到顶部
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomMarket = mockMarkets[Math.floor(Math.random() * mockMarkets.length)]
-      const newMarket = {
-        ...randomMarket,
-        id: randomMarket.id + '_new_' + Date.now() + '_refresh',
-        title: `${randomMarket.title} (刚刚创建)`,
-        participants: Math.floor(Math.random() * 50) + 1,
-        status: 'active'
-      }
-      
-      setNewCreatedMarkets(prev => [newMarket, ...prev].slice(0, 20)) // 保持最多20个，新的在顶部
-    }, 10000) // 每10秒
-
-    return () => clearInterval(interval)
-  }, [])
-
-  // 即将发射话题：每15秒追加一个新卡片到顶部
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomMarket = mockMarkets[Math.floor(Math.random() * mockMarkets.length)]
-      const newMarket = {
-        ...randomMarket,
-        id: randomMarket.id + '_launching_' + Date.now() + '_refresh',
-        title: `${randomMarket.title} (热度飙升)`,
-        participants: Math.floor(Math.random() * 500) + 100,
-        status: 'active'
-      }
-      
-      setAboutToLaunchMarkets(prev => [newMarket, ...prev].slice(0, 20)) // 保持最多20个，新的在顶部
-    }, 15000) // 每15秒
-
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    // 持续瀑布流刷新逻辑 - 模拟Polymarket官网效果
-    // 主要刷新间隔 - 每15秒一次大批量刷新
-    const mainInterval = setInterval(() => {
-      setLastRefreshTime(Date.now())
-      setIsWaterfallActive(true)
-      
-      // 大批量瀑布流：显示12-15个新项目
-      const newItems = mockMarkets.slice(0, 15).map(m => m.id)
-      setWaterfallItems([])
-      
-      newItems.forEach((itemId, index) => {
-        setTimeout(() => {
-          setWaterfallItems(prev => [...prev, itemId])
-        }, index * 150) // 每150ms显示一个新项目
-      })
-      
-      setTimeout(() => {
-        setIsWaterfallActive(false)
-        setWaterfallItems([])
-      }, 4000)
-    }, 15000) // 每15秒主要刷新
-
-    // 小批量持续刷新 - 每5秒添加2-3个新话题
-    const continuousInterval = setInterval(() => {
-      if (!isWaterfallActive) {
-        setIsWaterfallActive(true)
-        
-        // 随机选择2-3个话题进行小批量刷新
-        const randomItems = mockMarkets
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 3)
-          .map(m => m.id)
-        
-        setWaterfallItems([])
-        randomItems.forEach((itemId, index) => {
-          setTimeout(() => {
-            setWaterfallItems(prev => [...prev, itemId])
-          }, index * 300)
-        })
-        
-        setTimeout(() => {
-          setIsWaterfallActive(false)
-          setWaterfallItems([])
-        }, 1500)
-      }
-    }, 5000) // 每5秒小批量刷新
-
-    return () => {
-      clearInterval(mainInterval)
-      clearInterval(continuousInterval)
-    }
-  }, [isWaterfallActive])
-
-  useEffect(() => {
-    // 即将发射话题的持续瀑布流刷新
-    // 主要刷新 - 每20秒一次
-    const launchingMainInterval = setInterval(() => {
-      setLaunchingRefreshTime(Date.now())
-      setIsLaunchingWaterfallActive(true)
-      
-      // 获取即将发射的话题（参与人数适中的活跃话题）
-      const launchingItems = mockMarkets
-        .filter(market => market.status === 'active' || market.status === 'ending_soon')
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 10)
-        .map(m => m.id)
-      
-      setLaunchingWaterfallItems([])
-      
-      launchingItems.forEach((itemId, index) => {
-        setTimeout(() => {
-          setLaunchingWaterfallItems(prev => [...prev, itemId])
-        }, index * 200) // 每200ms显示一个新项目
-      })
-      
-      setTimeout(() => {
-        setIsLaunchingWaterfallActive(false)
-        setLaunchingWaterfallItems([])
-      }, 3000)
-    }, 20000) // 每20秒主要刷新
-
-    // 小批量持续刷新 - 每7秒添加1-2个话题
-    const launchingContinuousInterval = setInterval(() => {
-      if (!isLaunchingWaterfallActive) {
-        setIsLaunchingWaterfallActive(true)
-        
-        const randomItems = mockMarkets
-          .filter(market => market.status === 'active')
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 2)
-          .map(m => m.id)
-        
-        setLaunchingWaterfallItems([])
-        randomItems.forEach((itemId, index) => {
-          setTimeout(() => {
-            setLaunchingWaterfallItems(prev => [...prev, itemId])
-          }, index * 400)
-        })
-        
-        setTimeout(() => {
-          setIsLaunchingWaterfallActive(false)
-          setLaunchingWaterfallItems([])
-        }, 1200)
-      }
-    }, 7000) // 每7秒小批量刷新
-
-    return () => {
-      clearInterval(launchingMainInterval)
-      clearInterval(launchingContinuousInterval)
-    }
-  }, [isLaunchingWaterfallActive])
-
-  useEffect(() => {
-    // Auto-refresh every 3 minutes for "已发射" section
-    const launchedRefreshInterval = setInterval(() => {
-      setLaunchedRefreshTime(Date.now())
-    }, 180000) // 180 seconds
-
-    return () => clearInterval(launchedRefreshInterval)
-  }, [])
-
-  useEffect(() => {
-    // Auto-scroll effect for new markets - smooth continuous scroll
-    const scrollInterval = setInterval(() => {
-      setScrollPosition(prev => (prev + 1) % 100)
-    }, 100) // Smooth scroll every 100ms
-
-    return () => clearInterval(scrollInterval)
-  }, [])
-
-  // 按状态分组市场数据 - GMGN风格三列布局
-  const marketGroups = useMemo(() => {
+  // 过滤和排序市场数据
+  const filteredAndSortedMarkets = useMemo(() => {
     let filtered = mockMarkets
     
-    // Filter by search query
+    // 搜索过滤
     if (searchQuery) {
       filtered = filtered.filter(market => 
         market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -632,59 +74,45 @@ export default function Home() {
       )
     }
     
-    // Filter by time - simulate different data based on time filter
-    const timeMultiplier = {
-      '1m': 0.1,
-      '5m': 0.3, 
-      '1h': 1.0,
-      '6h': 1.5,
-      '24h': 2.0
-    }[selectedTimeFilter] || 1.0
-    
-    // Apply time-based filtering to simulate different market activity
-    filtered = filtered.map(market => ({
-      ...market,
-      participants: Math.floor(market.participants * timeMultiplier),
-      volume: `$${(parseFloat(market.volume.replace('$', '').replace('M', '')) * timeMultiplier).toFixed(1)}M`,
-      yesPercentage: Math.max(5, Math.min(95, market.yesPercentage + (timeMultiplier - 1) * 10))
-    }))
-    
-    // Add time-based randomization for all sections to simulate real-time updates
-    const newTimeOffset = Math.floor(lastRefreshTime / 60000) % 10
-    const launchingTimeOffset = Math.floor(launchingRefreshTime / 120000) % 8
-    const launchedTimeOffset = Math.floor(launchedRefreshTime / 180000) % 6
-    
-    // 按状态分组 - 增加更多话题数量
-    const newMarkets = filtered.filter(market => market.status === 'active' && market.participants < 100)
-      .map((market, index) => ({
-        ...market,
-        id: market.id + newTimeOffset * 100, // Simulate new IDs
-        title: `${market.title} (${new Date().getMinutes()}分钟前创建)`,
-        participants: Math.floor(Math.random() * 50) + 1
-      })).slice(0, 20) // Increased from 12 to 20
-    
-    const launchingMarkets = filtered.filter(market => market.status === 'active' && market.participants >= 100 && market.participants < 1000)
-      .map((market, index) => ({
-        ...market,
-        id: market.id + launchingTimeOffset * 200, // Simulate refreshed data
-        participants: market.participants + Math.floor(Math.random() * 100),
-        yesPercentage: Math.max(5, Math.min(95, market.yesPercentage + (Math.random() - 0.5) * 10))
-      })).slice(0, 25) // Increased from 15 to 25
-    
-    const launchedMarkets = filtered.filter(market => market.status === 'active' && market.participants >= 1000)
-      .map((market, index) => ({
-        ...market,
-        id: market.id + launchedTimeOffset * 300, // Simulate refreshed data
-        participants: market.participants + Math.floor(Math.random() * 500),
-        volume: `$${(parseFloat(market.volume.replace('$', '').replace('M', '')) + Math.random() * 2).toFixed(1)}M`
-      })).slice(0, 20) // Increased from 10 to 20
-    
-    return {
-      new: newMarkets,
-      launching: launchingMarkets,
-      launched: launchedMarkets
+    // 分类过滤
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(market => market.category === selectedCategory)
     }
-  }, [searchQuery, selectedTimeFilter, lastRefreshTime, launchingRefreshTime, launchedRefreshTime])
+    
+    // 排序
+    switch (sortBy) {
+      case 'newest':
+        return filtered.sort((a, b) => parseInt(b.id) - parseInt(a.id))
+      case 'oldest':
+        return filtered.sort((a, b) => parseInt(a.id) - parseInt(b.id))
+      case 'volume':
+        return filtered.sort((a, b) => b.participants - a.participants)
+      case 'ending_soon':
+        return filtered.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
+      default:
+        return filtered
+    }
+  }, [searchQuery, selectedCategory, sortBy])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // 初始化直播数据
+  useEffect(() => {
+    setLiveStreams(generateRandomStreams())
+    
+    const streamInterval = setInterval(() => {
+      setLiveStreams(generateRandomStreams())
+    }, 12000) // 每12秒刷新直播
+    
+    return () => {
+      clearInterval(streamInterval)
+    }
+  }, [])
 
   const LoadingSkeleton = () => (
     <div className="bg-tertiary rounded-2xl p-4 animate-pulse">
@@ -696,611 +124,493 @@ export default function Home() {
           <div className="h-3 bg-secondary rounded w-3/4"></div>
         </div>
       </div>
-      <div className="h-2 bg-secondary rounded mb-4"></div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="h-8 bg-secondary rounded"></div>
-        <div className="h-8 bg-secondary rounded"></div>
-        <div className="h-8 bg-secondary rounded"></div>
-      </div>
-      <div className="flex space-x-2">
-        <div className="flex-1 h-10 bg-secondary rounded-xl"></div>
-        <div className="flex-1 h-10 bg-secondary rounded-xl"></div>
-      </div>
     </div>
   )
 
-
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">{t('loading') || '加载中...'}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-primary text-primary language-transition">
-      {/* Top Navigation */}
-      <nav className="sticky top-0 z-50 glass-effect border-b border-primary">
-        <div className="responsive-container">
-          <div className="flex items-center justify-between h-14 md:h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-r from-[#00FFAE] to-[#00D4AA] rounded-lg flex items-center justify-center">
-                <span className="text-black font-bold text-sm md:text-lg">S</span>
-              </div>
-              <span className="text-lg md:text-xl font-bold text-primary">Socrates</span>
-            </div>
-
-            {/* Main Tabs */}
-            <div className="hidden md:flex items-center space-x-1">
-              {mainTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-3 lg:px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:scale-105 flex items-center space-x-1 lg:space-x-2 text-sm lg:text-base ${
-                    activeTab === tab.key
-                      ? 'bg-[#00FFAE] text-black'
-                      : 'text-secondary hover:text-primary hover:bg-tertiary'
-                  }`}
-                >
-                  <span className="text-sm lg:text-base">{tab.icon}</span>
-                  <span className="hidden lg:inline">{tab.label}</span>
-                  <span className="lg:hidden">{tab.label.slice(0, 2)}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Mobile Menu Button */}
-            <div className="md:hidden flex items-center">
-              <button className="p-2 text-primary hover:text-[#00FFAE] transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Right Side Controls */}
-            <div className="flex items-center space-x-2 md:space-x-4">
-              {/* Search Box */}
-              <div className="relative hidden md:block">
-                <input
-                    type="text"
-                    placeholder={t('search.placeholder')}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-48 lg:w-64 bg-tertiary border border-secondary rounded-lg px-3 py-2 text-sm text-primary placeholder-gray-400 focus:outline-none focus:border-[#00FFAE] transition-colors"
-                  />
-                  <svg className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-              </div>
-
-              {/* Balance Display */}
-              <div className="hidden lg:flex items-center space-x-2 xl:space-x-4">
-                <div className="bg-tertiary border border-secondary rounded-lg px-2 xl:px-4 py-2">
-                  <div className="text-xs text-secondary">{t('balance.portfolio')}</div>
-                  <div className="text-sm xl:text-base text-primary font-semibold">$3,247.89</div>
-                </div>
-                <div className="bg-tertiary border border-secondary rounded-lg px-2 xl:px-4 py-2">
-                  <div className="text-xs text-secondary">{t('balance.cash')}</div>
-                  <div className="text-sm xl:text-base text-primary font-semibold">$3,156.42</div>
-                </div>
-              </div>
-
-              {/* Compact Balance for Medium Screens */}
-              <div className="hidden md:flex lg:hidden items-center">
-                <div className="bg-tertiary border border-secondary rounded-lg px-3 py-2">
-                  <div className="text-xs text-secondary">余额</div>
-                  <div className="text-sm text-primary font-semibold">$3,156</div>
-                </div>
-              </div>
-
-              {/* Language Toggle */}
-              <Navbar />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        {/* Mobile Tab Navigation */}
-        <div className="flex flex-wrap gap-2 mb-8 md:hidden overflow-x-auto">
-          {mainTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 flex items-center space-x-2 whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'bg-[#00FFAE] text-black'
-                  : 'bg-tertiary text-secondary hover:bg-secondary'
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Time Filter - Only show for Markets tab */}
-        {activeTab === 'Markets' && (
-          <div className="flex flex-wrap gap-2 mb-8">
-            <span className="text-secondary text-sm font-medium px-3 py-2">{t('filter.hotSections')}:</span>
-            {timeFilters.map((filter) => (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
+      {/* 主标签页导航 */}
+      <div className="bg-white border-b border-gray-200 sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex space-x-8">
+            {mainTabs.map((tab) => (
               <button
-                key={filter.key}
-                onClick={() => setSelectedTimeFilter(filter.key)}
-                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 ${
-                  selectedTimeFilter === filter.key
-                    ? 'bg-[#00FFAE] text-black'
-                    : 'bg-tertiary text-secondary hover:bg-secondary'
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center space-x-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                {filter.label}
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Content based on active tab */}
+      {/* 主内容区域 */}
+      <div className="px-4 py-6">
         {activeTab === 'Markets' && (
-          <div className="space-y-8">
-            {/* Search and Filter Bar */}
-            <div className="bg-tertiary rounded-2xl p-6 border border-secondary">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+          <div className="space-y-6">
+
+
+            {/* 话题板块分类 */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">话题板块分类</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {[
+                  { key: 'crypto', label: '加密货币', icon: '₿', color: 'bg-orange-100 text-orange-700' },
+                  { key: 'sports', label: '体育赛事', icon: '⚽', color: 'bg-green-100 text-green-700' },
+                  { key: 'politics', label: '政治选举', icon: '🗳️', color: 'bg-blue-100 text-blue-700' },
+                  { key: 'tech', label: '科技创新', icon: '🚀', color: 'bg-purple-100 text-purple-700' },
+                  { key: 'entertainment', label: '娱乐影视', icon: '🎬', color: 'bg-pink-100 text-pink-700' },
+                  { key: 'finance', label: '金融市场', icon: '📈', color: 'bg-indigo-100 text-indigo-700' }
+                ].map((topic) => (
+                  <button
+                    key={topic.key}
+                    onClick={() => setSelectedCategory(topic.key)}
+                    className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                      selectedCategory === topic.key 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full ${topic.color} flex items-center justify-center text-2xl mb-2 mx-auto`}>
+                      {topic.icon}
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">{topic.label}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* 搜索和过滤栏 */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+                {/* 搜索框 */}
                 <div className="flex-1 max-w-md">
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder={t('search.placeholder')}
+                      placeholder={t('search.placeholder') || '搜索市场...'}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-primary border border-secondary rounded-xl text-primary placeholder-secondary focus:outline-none focus:border-[#00FFAE] transition-colors"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 text-secondary w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4">
-                   <select 
-                     value={selectedCategory}
-                     onChange={(e) => setSelectedCategory(e.target.value)}
-                     className="bg-primary border border-secondary rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-[#00FFAE] transition-colors"
-                   >
-                     <option value="all">{t('category.all')}</option>
-                     <option value="crypto">{t('category.crypto')}</option>
-                     <option value="politics">{t('category.politics')}</option>
-                     <option value="sports">{t('category.sports')}</option>
-                     <option value="tech">{t('category.tech')}</option>
-                     <option value="entertainment">{t('category.entertainment')}</option>
-                   </select>
-                   
-                   <select 
-                     value={sortBy}
-                     onChange={(e) => setSortBy(e.target.value)}
-                     className="bg-primary border border-secondary rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-[#00FFAE] transition-colors"
-                   >
-                     <option value="newest">{t('sort.newest')}</option>
-                     <option value="volume">{t('sort.volume')}</option>
-                     <option value="ending">{t('sort.ending')}</option>
-                     <option value="popular">{t('sort.popular')}</option>
-                   </select>
-                 </div>
+                {/* 分类过滤 */}
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">{t('category.all') || '全部分类'}</option>
+                  <option value="sports">{t('category.sports') || '体育'}</option>
+                  <option value="politics">{t('category.politics') || '政治'}</option>
+                  <option value="entertainment">{t('category.entertainment') || '娱乐'}</option>
+                  <option value="technology">{t('category.technology') || '科技'}</option>
+                  <option value="economics">{t('category.economics') || '经济'}</option>
+                </select>
+                
+                {/* 排序选择 */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="newest">{t('sort.newest') || '最新'}</option>
+                  <option value="oldest">{t('sort.oldest') || '最早'}</option>
+                  <option value="volume">{t('sort.volume') || '交易量'}</option>
+                  <option value="ending_soon">{t('sort.ending_soon') || '即将结束'}</option>
+                </select>
               </div>
-              
+            </div>
 
+            {/* 市场卡片网格 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredAndSortedMarkets.map((market) => (
+                <PredictionCard
+                  key={market.id}
+                  id={market.id}
+                  title={market.title}
+                  icon={market.icon}
+                  imageUrl={market.imageUrl}
+                  creatorAvatar={market.creatorAvatar}
+                  creatorName={market.creatorName}
+                  tags={market.tags}
+                  options={market.options}
+                  yesPercentage={market.yesPercentage}
+                  currentPrice={market.currentPrice}
+                  priceChange={market.priceChange}
+                  participants={market.participants}
+                  liquidity={market.liquidity}
+                  volume={market.volume}
+                  endDate={market.endDate}
+                  status={market.status}
+                  isHot={market.isHot}
+                  category={market.category}
+                  onCardClick={() => handleCardClick(market.id)}
+                />
+              ))}
             </div>
             
-            {/* 统一滚动三列布局 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* 最新创建话题 */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-primary">{t('section.newCreated')}</span>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-green-400">{t('section.updateEvery10s')}</span>
-                    </div>
-                  </div>
-                  <span className="text-sm text-secondary bg-tertiary px-2 py-1 rounded">{newCreatedMarkets.length}</span>
-                </div>
-                <div className="space-y-4">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, index) => (
-                      <LoadingSkeleton key={index} />
-                    ))
-                  ) : (
-                    newCreatedMarkets.map((market, index) => {
-                      const isNewlyAdded = market.id.includes('_refresh')
-                      return (
-                        <div 
-                          key={market.id} 
-                          className={`hover:scale-105 transition-all duration-500 animate-fade-in ${
-                            isNewlyAdded && index < 3 
-                              ? 'ring-2 ring-green-500 shadow-lg shadow-green-500/20 animate-pulse' 
-                              : ''
-                          }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <PredictionCard 
-                            {...market} 
-                            onCardClick={handleCardClick}
-                          />
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
+            {filteredAndSortedMarkets.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-gray-400 text-6xl mb-4">📊</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {t('no_markets.title') || '暂无市场'}
+                </h3>
+                <p className="text-gray-500">
+                  {t('no_markets.description') || '没有找到符合条件的市场，请尝试调整搜索条件。'}
+                </p>
               </div>
-
-              {/* 即将发射话题 */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-primary">{t('section.aboutToLaunch')}</span>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-orange-400">{t('section.updateEvery15s')}</span>
-                    </div>
-                  </div>
-                  <span className="text-sm text-secondary bg-tertiary px-2 py-1 rounded">{aboutToLaunchMarkets.length}</span>
-                </div>
-                <div className="space-y-4">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, index) => (
-                      <LoadingSkeleton key={index} />
-                    ))
-                  ) : (
-                    aboutToLaunchMarkets.map((market, index) => {
-                      const isNewlyAdded = market.id.includes('_refresh')
-                      return (
-                        <div 
-                          key={market.id} 
-                          className={`hover:scale-105 transition-all duration-500 animate-fade-in ${
-                            isNewlyAdded && index < 3 
-                              ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 animate-pulse' 
-                              : ''
-                          }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <PredictionCard 
-                            {...market} 
-                            onCardClick={handleCardClick}
-                          />
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* 已经发射话题 */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-primary">{t('section.launched')}</span>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-blue-400">{t('section.keepOriginal')}</span>
-                    </div>
-                  </div>
-                  <span className="text-sm text-secondary bg-tertiary px-2 py-1 rounded">{launchedMarkets.length}</span>
-                </div>
-                <div className="space-y-4">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, index) => (
-                      <LoadingSkeleton key={index} />
-                    ))
-                  ) : (
-                    launchedMarkets.map((market, index) => (
-                      <div 
-                        key={market.id} 
-                        className="hover:scale-105 transition-all duration-300 animate-fade-in" 
-                        style={{ animationDelay: `${index * 100}ms` }}
-                      >
-                        <PredictionCard 
-                          {...market} 
-                          onCardClick={handleCardClick}
-                        />
-                      </div>
-                    ))
-                )}
-              </div>
-            </div>
-          </div>
+            )}
           </div>
         )}
+        
+        {activeTab === 'Invite' && (
+          <div className="space-y-6">
+            {/* 邀请横幅 - 参考Hyperliquid绿色主题 */}
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-xl p-8 text-white relative overflow-hidden">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-center mb-6">
+                  <div className="text-5xl mr-4">🎁</div>
+                  <div className="text-center">
+                    <h2 className="text-4xl font-bold mb-2">推荐</h2>
+                    <p className="text-emerald-100 text-lg">邀请用户获取收益奖励</p>
+                  </div>
+                </div>
+                
+                {/* 统计数据 */}
+                <div className="grid grid-cols-3 gap-6 mb-8">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-emerald-100">0</div>
+                    <div className="text-sm text-emerald-200">推荐交易者</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-emerald-100">0.00 美元</div>
+                    <div className="text-sm text-emerald-200">累计收益</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-emerald-100">0.00 美元</div>
+                    <div className="text-sm text-emerald-200">可提取收益</div>
+                  </div>
+                </div>
+                
+                {/* 操作按钮 */}
+                <div className="flex justify-center space-x-4">
+                  <button 
+                    onClick={() => router.push('/invite')}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                  >
+                    邀请用户
+                  </button>
+                  <button className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                    历史记录
+                  </button>
+                  <button className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                    获取支持
+                  </button>
+                </div>
+              </div>
+            </div>
 
-        {/* Following Tab - 跟单板块 */}
+            {/* 邀请说明 - 简化版本 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">了解更多</h3>
+                <p className="text-gray-600">推荐用户并获取收益奖励</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold mt-1">1</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">分享邀请链接</h4>
+                      <p className="text-sm text-gray-600">将您的专属邀请链接分享给朋友</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold mt-1">2</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">朋友开始交易</h4>
+                      <p className="text-sm text-gray-600">被邀请用户注册并开始交易</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold mt-1">3</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">获得奖励</h4>
+                      <p className="text-sm text-gray-600">从被邀请用户的交易中获得持续收益</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold mt-1">4</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">实时到账</h4>
+                      <p className="text-sm text-gray-600">收益实时到账，随时可以提取</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 推荐表格 - 类似Hyperliquid的表格样式 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">推荐历史</h3>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加入日期</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">已开仓</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">收益</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center">
+                          <div className="text-4xl mb-3">👥</div>
+                          <p className="text-lg font-medium mb-2">暂无推荐记录</p>
+                          <p className="text-sm">开始邀请用户获取收益奖励</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+
+          </div>
+        )}
+        
         {activeTab === 'Following' && (
           <div className="space-y-6">
             {/* 聪明钱包排行榜 */}
-            <div className="bg-tertiary rounded-2xl p-6 border border-secondary">
-              <h2 className="text-xl font-bold text-primary mb-6">{t('following.smartWallets')}</h2>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                🧠 {t('following.smartWallets')}
+              </h2>
               
-              {/* 表头 */}
-              <div className="grid grid-cols-12 gap-4 text-sm text-secondary font-medium mb-4 px-4">
-                <div className="col-span-2">{t('following.wallet')}</div>
-                <div className="col-span-1 text-center">{t('following.1dPnl')}</div>
-                <div className="col-span-1 text-center">{t('following.7dPnl')}</div>
-                <div className="col-span-1 text-center">{t('following.30dPnl')}</div>
-                <div className="col-span-1 text-center">{t('following.7dWinRate')}</div>
-                <div className="col-span-1 text-center">{t('following.7dTrades')}</div>
-                <div className="col-span-1 text-center">{t('following.followers')}</div>
-                <div className="col-span-2 text-center">{t('following.balance')}</div>
-                <div className="col-span-2 text-center">{t('following.actions')}</div>
-              </div>
-              
-              {/* 钱包列表 */}
-              <div className="space-y-3">
-                {smartWallets.map((wallet, index) => (
-                  <div key={wallet.id} className="grid grid-cols-12 gap-4 items-center bg-secondary rounded-xl p-4 hover:bg-primary transition-colors">
-                    {/* 钱包信息 */}
-                    <div className="col-span-2 flex items-center space-x-3">
-                      <div className="relative">
-                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-lg">
-                          {wallet.avatar}
-                        </div>
-                        {wallet.status === 'online' && (
-                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-secondary"></div>
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-medium text-primary">{wallet.address}</div>
-                        <div className="text-xs text-secondary">#{index + 1}</div>
-                      </div>
-                    </div>
-                    
-                    {/* 1D盈亏 */}
-                    <div className="col-span-1 text-center">
-                      <span className={`font-medium ${
-                        wallet.pnl1d.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {wallet.pnl1d}
-                      </span>
-                    </div>
-                    
-                    {/* 7D盈亏 */}
-                    <div className="col-span-1 text-center">
-                      <span className={`font-medium ${
-                        wallet.pnl7d.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {wallet.pnl7d}
-                      </span>
-                    </div>
-                    
-                    {/* 30D盈亏 */}
-                    <div className="col-span-1 text-center">
-                      <span className={`font-medium ${
-                        wallet.pnl30d.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {wallet.pnl30d}
-                      </span>
-                    </div>
-                    
-                    {/* 7D胜率 */}
-                    <div className="col-span-1 text-center">
-                      <span className="font-medium text-primary">{wallet.winRate7d}</span>
-                    </div>
-                    
-                    {/* 7D交易数 */}
-                    <div className="col-span-1 text-center">
-                      <span className="font-medium text-primary">{wallet.trades7d}</span>
-                    </div>
-                    
-                    {/* 跟单人数 */}
-                    <div className="col-span-1 text-center">
-                      <span className="font-medium text-primary">{wallet.followers}</span>
-                    </div>
-                    
-                    {/* 钱包余额 */}
-                    <div className="col-span-2 text-center">
-                      <span className="font-medium text-primary">{wallet.balance}</span>
-                    </div>
-                    
-                    {/* 操作按钮 */}
-                    <div className="col-span-2 flex space-x-2 justify-center">
-                      <button 
-                        onClick={() => setSelectedWallet(wallet.id)}
-                        className="bg-[#00FFAE] hover:bg-[#00D4AA] text-black px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-                      >
-                        {t('following.follow')}
-                      </button>
-                      <button className="bg-tertiary hover:bg-secondary text-secondary hover:text-primary px-4 py-2 rounded-lg font-medium transition-colors text-sm">
-                        {t('following.details')}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">{t('following.wallet')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.1dPnl')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.7dPnl')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.30dPnl')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.7dWinRate')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.7dTrades')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.followers')}</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900">{t('following.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      {
+                        address: '0x1234...5678',
+                        name: 'CryptoWhale',
+                        pnl1d: '+12.5%',
+                        pnl7d: '+45.2%',
+                        pnl30d: '+156.8%',
+                        winRate: '78%',
+                        trades: '23',
+                        followers: '1.2K',
+                        status: 'online'
+                      },
+                      {
+                        address: '0x9876...4321',
+                        name: 'SmartTrader',
+                        pnl1d: '+8.3%',
+                        pnl7d: '+32.1%',
+                        pnl30d: '+134.5%',
+                        winRate: '72%',
+                        trades: '18',
+                        followers: '856',
+                        status: 'online'
+                      },
+                      {
+                        address: '0x5555...9999',
+                        name: 'MarketMaster',
+                        pnl1d: '+15.7%',
+                        pnl7d: '+28.9%',
+                        pnl30d: '+98.3%',
+                        winRate: '69%',
+                        trades: '31',
+                        followers: '634',
+                        status: 'offline'
+                      },
+                      {
+                        address: '0x7777...3333',
+                        name: 'ProfitGuru',
+                        pnl1d: '+6.2%',
+                        pnl7d: '+19.4%',
+                        pnl30d: '+87.6%',
+                        winRate: '65%',
+                        trades: '15',
+                        followers: '423',
+                        status: 'online'
+                      },
+                      {
+                        address: '0x2222...8888',
+                        name: 'TrendFollower',
+                        pnl1d: '+4.1%',
+                        pnl7d: '+16.7%',
+                        pnl30d: '+76.2%',
+                        winRate: '61%',
+                        trades: '12',
+                        followers: '298',
+                        status: 'offline'
+                      }
+                    ].map((trader, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                              {trader.name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{trader.name}</div>
+                              <div className="text-sm text-gray-500 flex items-center">
+                                {trader.address}
+                                <span className={`ml-2 w-2 h-2 rounded-full ${
+                                  trader.status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+                                }`}></span>
+                                <span className="ml-1 text-xs">
+                                  {trader.status === 'online' ? t('following.online') : t('following.offline')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-green-600 font-medium">{trader.pnl1d}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-green-600 font-medium">{trader.pnl7d}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-green-600 font-medium">{trader.pnl30d}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-blue-600 font-medium">{trader.winRate}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-gray-700">{trader.trades}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-gray-700">{trader.followers}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex space-x-2 justify-end">
+                            <button className="px-3 py-1 bg-green-500 text-white text-sm rounded-full hover:bg-green-600 transition-colors">
+                              {t('following.follow')}
+                            </button>
+                            <button className="px-3 py-1 bg-blue-500 text-white text-sm rounded-full hover:bg-blue-600 transition-colors">
+                              {t('following.copy')}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-            
-            {/* 跟单历史 */}
-            <div className="bg-tertiary rounded-2xl p-6 border border-secondary">
-              <h3 className="text-lg font-bold text-primary mb-4">{t('following.myHistory')}</h3>
-              <div className="text-center py-8 text-secondary">
-                <div className="text-4xl mb-4">📊</div>
-                <p>{t('following.noRecords')}</p>
-                <p className="text-sm mt-2">{t('following.startCopyTrading')}</p>
+
+            {/* 我的跟单历史 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                📈 {t('following.myHistory')}
+              </h3>
+              
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-4xl mb-3">📊</div>
+                <p className="text-gray-500 mb-4">{t('following.noRecords')}</p>
+                <p className="text-sm text-gray-400">{t('following.startCopyTrading')}</p>
               </div>
             </div>
           </div>
         )}
-
-        {/* Live Tab Content */}
+        
         {activeTab === 'Live' && (
           <div className="space-y-6">
-            {/* Featured Live Streams */}
-            <div className="bg-[#1A1A1A] rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">{t('live.hotStreams')}</h2>
+            {/* 热门直播区域 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  🔴 {t('live.featuredStreams')}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">{t('live.liveNow')}</span>
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { id: 1, title: 'CryptoKing - BTC突破分析', topic: '比特币即将突破12万美元？技术分析详解', viewers: 2847, avatar: '👑' },
-                  { id: 2, title: 'MarketGuru - 实时交易', topic: '跟着我一起抓住市场机会', viewers: 1923, avatar: '📈' },
-                  { id: 3, title: 'PredictionMaster - 预测解析', topic: '今日热门预测市场深度分析', viewers: 3456, avatar: '🔮' },
-                  { id: 4, title: 'TechAnalyst - 技术指标', topic: 'RSI与MACD双重信号确认', viewers: 1567, avatar: '📊' },
-                  { id: 5, title: 'WhaleWatcher - 巨鲸动向', topic: '监控大户资金流向', viewers: 2134, avatar: '🐋' },
-                  { id: 6, title: 'NewsTrader - 消息面分析', topic: '重大新闻对市场的影响', viewers: 987, avatar: '📰' }
-                ].map((stream) => (
-                  <div key={stream.id} className="bg-[#0F0F0F] rounded-lg overflow-hidden hover:bg-[#1F1F1F] transition-colors cursor-pointer group">
-                    <div className="aspect-video bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 relative overflow-hidden">
-                      {/* 模拟视频内容 */}
-                      <div className="absolute inset-0 bg-black bg-opacity-20">
-                        {/* 模拟K线图 */}
-                        <div className="absolute top-4 left-4 right-4">
-                          <div className="flex items-end space-x-1 h-16">
-                            {Array.from({ length: 20 }).map((_, i) => (
-                              <div 
-                                key={i} 
-                                className={`w-2 bg-gradient-to-t ${
-                                  Math.random() > 0.5 ? 'from-green-400 to-green-600' : 'from-red-400 to-red-600'
-                                } opacity-70`}
-                                style={{ height: `${Math.random() * 60 + 20}%` }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* 主播头像 */}
-                        <div className="absolute bottom-16 left-4">
-                          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-2xl border-2 border-white">
-                            {stream.avatar}
-                          </div>
-                        </div>
-                        
-                        {/* 实时数据 */}
-                        <div className="absolute top-4 right-4 bg-black bg-opacity-60 rounded px-2 py-1">
-                          <div className="text-green-400 text-xs font-mono">
-                            BTC: ${(Math.random() * 10000 + 90000).toFixed(0)}
-                          </div>
-                        </div>
+                {liveStreams.map((stream) => (
+                  <div 
+                    key={stream.id}
+                    onClick={() => router.push(`/live/${stream.id}`)}
+                    className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    <div className={`aspect-video bg-gradient-to-br ${stream.gradient} rounded-lg mb-3 relative`}>
+                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse"></div>
+                        LIVE
                       </div>
-                      
-                      {/* LIVE标签 */}
-                      <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold animate-pulse">
-                        🔴 LIVE
-                      </div>
-                      
-                      {/* 观看人数 */}
-                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
-                        <span>👁</span>
-                        <span>{stream.viewers.toLocaleString()}</span>
-                      </div>
-                      
-                      {/* 悬停播放按钮 */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                          <div className="w-0 h-0 border-l-8 border-r-0 border-t-6 border-b-6 border-l-white border-t-transparent border-b-transparent ml-1"></div>
-                        </div>
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                        {stream.viewers} {t('live.watching')}
                       </div>
                     </div>
-                    
-                    <div className="p-4">
-                      <h3 className="text-white font-medium mb-1 line-clamp-1">{stream.title}</h3>
-                      <p className="text-gray-400 text-sm line-clamp-2">{stream.topic}</p>
-                      <div className="flex items-center justify-between mt-3 text-xs">
-                        <span className="text-green-400 flex items-center space-x-1">
-                          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                          <span>{t('live.streaming')}</span>
-                        </span>
-                        <span className="text-gray-500">{stream.viewers.toLocaleString()} {t('live.viewers')}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Live Chat */}
-            <div className="bg-[#1A1A1A] rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">{t('live.realTimeChat')}</h2>
-              <div className="bg-[#0F0F0F] rounded-lg p-4 h-64 overflow-y-auto mb-4">
-                {[...Array(20)].map((_, i) => (
-                  <div key={i} className="mb-2 text-sm">
-                    <span className="text-[#00FFAE] font-medium">用户{i + 1}:</span>
-                    <span className="text-gray-300 ml-2">这个项目看起来很有潜力！</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="输入消息..."
-                  className="flex-1 bg-[#0F0F0F] border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-[#00FFAE]"
-                />
-                <button className="bg-[#00FFAE] hover:bg-[#00D4AA] text-black px-6 py-2 rounded-lg font-medium transition-colors">
-                  发送
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Video Tab Content */}
-        {activeTab === 'Video' && (
-          <div className="space-y-6">
-            <div className="bg-[#1A1A1A] rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">🎥 热门视频</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
-                  <div key={i} className="bg-[#0F0F0F] rounded-lg overflow-hidden hover:bg-[#1F1F1F] transition-colors cursor-pointer">
-                    <div className="aspect-video bg-gradient-to-br from-green-600 to-teal-600 relative">
-                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                        {Math.floor(Math.random() * 60) + 1}:{String(Math.floor(Math.random() * 60)).padStart(2, '0')}
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                          <div className="w-0 h-0 border-l-4 border-r-0 border-t-2 border-b-2 border-l-white border-t-transparent border-b-transparent ml-1"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-white font-medium mb-2">市场分析第{i}期</h3>
-                      <p className="text-gray-400 text-sm mb-2">深度解析当前市场趋势和投资机会</p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{Math.floor(Math.random() * 10000) + 1000} 观看</span>
-                        <span>{Math.floor(Math.random() * 7) + 1}天前</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Audio Tab Content */}
-        {activeTab === 'Audio' && (
-          <div className="space-y-6">
-            <div className="bg-[#1A1A1A] rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">🎙️ 语音直播</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-[#0F0F0F] rounded-lg p-6 hover:bg-[#1F1F1F] transition-colors cursor-pointer">
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">主{i}</span>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-white font-medium mb-1">语音房间 {i}</h3>
-                        <p className="text-gray-400 text-sm">正在讨论: DeFi协议分析</p>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                          <span className="text-red-400 text-xs">直播中</span>
-                          <span className="text-gray-500 text-xs">• {Math.floor(Math.random() * 500) + 50} 听众</span>
-                        </div>
-                      </div>
-                    </div>
+                    <h3 className="font-medium text-gray-900 mb-1">{stream.title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{stream.description}</p>
                     <div className="flex items-center justify-between">
-                      <div className="flex space-x-2">
-                        {[1, 2, 3, 4].map((j) => (
-                          <div key={j} className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs">U{j}</span>
-                          </div>
-                        ))}
-                        <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
-                          <span className="text-gray-400 text-xs">+{Math.floor(Math.random() * 20) + 5}</span>
-                        </div>
-                      </div>
-                      <button className="bg-[#00FFAE] hover:bg-[#00D4AA] text-black px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        加入
+                      <span className="text-xs text-gray-500">{stream.streamer}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/live/${stream.id}`)
+                        }}
+                        className="text-xs bg-green-500 text-white px-3 py-1 rounded-full hover:bg-green-600"
+                      >
+                        {t('live.joinStream')}
                       </button>
                     </div>
                   </div>
@@ -1308,120 +618,85 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Audio Podcasts */}
-            <div className="bg-[#1A1A1A] rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">🎧 热门播客</h2>
-              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="bg-[#0F0F0F] rounded-lg p-4 hover:bg-[#1F1F1F] transition-colors cursor-pointer">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold">P{i}</span>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-white font-medium mb-1">加密货币深度访谈 第{i}期</h3>
-                        <p className="text-gray-400 text-sm">与行业专家探讨最新趋势</p>
+            {/* 直播排行榜 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 热门主播排行 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                  🏆 热门主播排行
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    { rank: 1, name: 'CryptoKing', viewers: '2.1K', profit: '+156%', badge: '🥇' },
+                    { rank: 2, name: 'MarketWizard', viewers: '1.8K', profit: '+134%', badge: '🥈' },
+                    { rank: 3, name: 'TradeMaster', viewers: '1.5K', profit: '+98%', badge: '🥉' },
+                    { rank: 4, name: 'PumpGuru', viewers: '1.2K', profit: '+87%', badge: '4️⃣' },
+                    { rank: 5, name: 'CoinSage', viewers: '956', profit: '+76%', badge: '5️⃣' }
+                  ].map((streamer) => (
+                    <div key={streamer.rank} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-lg">{streamer.badge}</span>
+                        <div>
+                          <div className="font-medium text-gray-900">{streamer.name}</div>
+                          <div className="text-sm text-gray-500">{streamer.viewers} 观看中</div>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-gray-500 text-xs">{Math.floor(Math.random() * 60) + 10}分钟</div>
-                        <div className="text-gray-500 text-xs">{Math.floor(Math.random() * 5000) + 1000} 播放</div>
+                        <div className="text-sm font-medium text-green-600">{streamer.profit}</div>
+                        <div className="text-xs text-gray-500">7日收益</div>
                       </div>
-                      <button className="w-10 h-10 bg-[#00FFAE] hover:bg-[#00D4AA] rounded-full flex items-center justify-center transition-colors">
-                        <div className="w-0 h-0 border-l-3 border-r-0 border-t-2 border-b-2 border-l-black border-t-transparent border-b-transparent ml-1"></div>
-                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 实时聊天区域 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                  💬 {t('live.realTimeChat')}
+                </h3>
+                <div className="h-64 bg-gray-50 rounded-lg p-3 mb-3 overflow-y-auto">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium text-blue-600">TradePro:</span>
+                      <span className="text-gray-700">刚刚买入了新的预测市场，看好这个趋势！</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium text-green-600">CryptoFan:</span>
+                      <span className="text-gray-700">主播分析得很到位，跟着操作赚了不少</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium text-purple-600">MarketLover:</span>
+                      <span className="text-gray-700">这个市场的流动性很好，值得关注</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium text-orange-600">PumpExpert:</span>
+                      <span className="text-gray-700">建议大家理性投资，控制风险</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Load More Button - Only for Markets */}
-        {activeTab === 'Markets' && !isLoading && (marketGroups.new.length > 0 || marketGroups.launching.length > 0 || marketGroups.launched.length > 0) && (
-          <div className="text-center mt-12">
-            <button className="bg-[#00FFAE] hover:bg-[#00D4AA] text-black font-bold py-3 px-8 rounded-lg transition-all duration-200 hover:scale-105 animate-bounce-in">
-              加载更多
-            </button>
-          </div>
-        )}
-
-        {/* No Results - Only for Markets */}
-        {activeTab === 'Markets' && !isLoading && marketGroups.new.length === 0 && marketGroups.launching.length === 0 && marketGroups.launched.length === 0 && (
-          <div className="text-center py-12 animate-fade-in">
-            <div className="text-gray-400 text-lg mb-4">暂无搜索结果</div>
-            <button 
-              onClick={() => {
-                setSearchQuery('')
-              }}
-              className="text-[#00FFAE] hover:text-[#00D4AA] transition-colors hover:scale-105"
-            >
-              清除搜索条件
-            </button>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-dark-700 mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-accent-green to-primary-400 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
                 </div>
-                <span className="text-xl font-bold text-gradient">PredictMarket</span>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder={t('live.chatPlaceholder')}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <button className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                    {t('live.send')}
+                  </button>
+                </div>
               </div>
-              <p className="text-gray-400">
-                {t('footer.description')}
-              </p>
             </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">{t('footer.markets')}</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">{t('category.crypto')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('category.politics')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('category.sports')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('category.tech')}</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">{t('footer.support')}</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">{t('footer.helpCenter')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('footer.documentation')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('footer.api')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('footer.contact')}</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">{t('footer.community')}</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Discord</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Twitter</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Telegram</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">GitHub</a></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-dark-700 mt-8 pt-8 text-center text-gray-400">
-            <p>{t('footer.copyright')}</p>
-          </div>
-        </div>
-      </footer>
 
-      {/* Market Detail Modal */}
-      {selectedMarketId && (
-        <MarketDetail
-          marketId={selectedMarketId}
-          onClose={() => setSelectedMarketId(null)}
-        />
-      )}
+            {/* 开始直播按钮 */}
+            <div className="text-center">
+              <button className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-3 rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all transform hover:scale-105">
+                🎥 {t('live.startStream')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
